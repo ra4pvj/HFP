@@ -5,15 +5,22 @@ on:
     tags: ['v*']
 jobs:
   build:
-    runs-on: windows-latest
+    # Python 3.8 is the last version that runs on Windows 7; numpy 1.x (not 2.x) runs on CPUs without SSE4.2/POPCNT
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        arch: [x64, x86]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - run: pip install numpy sounddevice pyinstaller
-      - run: pyinstaller --noconfirm --onefile --windowed --name HFPagerApp --collect-all sounddevice --hidden-import hfpager_modem --hidden-import hfpager_rx hfpager_app.py
+          python-version: '3.8'
+          architecture: ${{ matrix.arch }}
+      - run: pip install "numpy==1.24.4" "sounddevice==0.4.6" "pyserial>=3.5" "pyinstaller==5.13.2"
+      # one-folder build: nothing is extracted to %TEMP% at start-up (avoids "Failed to extract ... dll")
+      - run: pyinstaller --noconfirm --onedir --windowed --name HFPagerApp --collect-all sounddevice --hidden-import hfpager_modem --hidden-import hfpager_rx --hidden-import hfpager_ptt --hidden-import hfpager_rig --hidden-import serial.tools.list_ports hfpager_app.py
+      - run: Compress-Archive -Path dist\HFPagerApp -DestinationPath HFPagerApp-windows-${{ matrix.arch }}.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: HFPagerApp-windows
-          path: dist/HFPagerApp.exe
+          name: HFPagerApp-windows-${{ matrix.arch }}
+          path: HFPagerApp-windows-${{ matrix.arch }}.zip

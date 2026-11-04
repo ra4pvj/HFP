@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_all
 datas, binaries, hiddenimports = collect_all('sounddevice')
 a = Analysis(['hfpager_app.py'], pathex=['.'], binaries=binaries, datas=datas,
-             hiddenimports=hiddenimports + ['hfpager_modem', 'hfpager_rx'])
+             hiddenimports=hiddenimports + ['hfpager_modem', 'hfpager_rx', 'hfpager_ptt', 'hfpager_rig', 'serial', 'serial.tools.list_ports'])
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='HFPagerApp', console=False)
 coll = COLLECT(exe, a.binaries, a.datas, name='HFPagerApp')
