@@ -40,6 +40,7 @@ def _app_dir():
                         'HFPagerApp')
 
 
+APP_VERSION = '2026-11-05c'
 APP_DIR = _app_dir()
 MONO_FONT = 'Menlo' if sys.platform == 'darwin' else ('Consolas' if sys.platform.startswith('win') else 'DejaVu Sans Mono')
 SETTINGS_FILE = os.path.join(APP_DIR, 'settings.json')
@@ -596,7 +597,7 @@ def run_gui():
 
     import tkinter.font as tkfont
     root = tk.Tk()
-    root.title('HFPager-совместимый пейджер (PS-18)')
+    root.title('HFPager-совместимый пейджер (PS-18)  v' + APP_VERSION)
     try:            # fit small screens (e.g. 1366x768): never taller than the screen
         _sh = int(root.winfo_screenheight())
         root.geometry('1040x%d' % max(560, min(860, _sh - 90)))
@@ -820,8 +821,17 @@ def run_gui():
         lo = wf_state['lo']
         norm = np.clip((wf - lo) / 45.0, 0.0, 1.0)
         rgb = lut[(norm * 255).astype(np.uint8)]
-        ppm = b'P6 %d %d 255\n' % (WF_W, WF_H) + rgb.tobytes()
-        img = tk.PhotoImage(data=ppm, format='PPM').zoom(ZOOM, ZOOM)
+        try:
+            ppm = b'P6 %d %d 255\n' % (WF_W, WF_H) + rgb.tobytes()
+            img = tk.PhotoImage(data=ppm, format='PPM').zoom(ZOOM, ZOOM)
+        except Exception as ex:                  # old Tk (Python 3.8 / Windows 7): fall back to pixel-by-pixel put
+            if not wf_state.get('warned'):
+                wf_state['warned'] = True
+                add('[%s] • Спектр: PPM не поддерживается (%s), использую медленный режим' % (now(), ex), 'sys')
+            img = tk.PhotoImage(width=WF_W, height=WF_H)
+            img.put(' '.join('{' + ' '.join('#%02x%02x%02x' % (r_, g_, b_) for r_, g_, b_ in row) + '}'
+                             for row in rgb.tolist()))
+            img = img.zoom(ZOOM, ZOOM)
         wf_state['img'] = img                    # keep a reference
         wf_canvas.itemconfig(wf_item, image=img)
 
