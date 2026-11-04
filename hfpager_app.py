@@ -597,7 +597,15 @@ def run_gui():
     import tkinter.font as tkfont
     root = tk.Tk()
     root.title('HFPager-совместимый пейджер (PS-18)')
-    root.geometry('1040x860')
+    try:            # fit small screens (e.g. 1366x768): never taller than the screen
+        _sh = int(root.winfo_screenheight())
+        root.geometry('1040x%d' % max(560, min(860, _sh - 90)))
+    except Exception:
+        root.geometry('1040x860')
+    try:
+        root.minsize(900, 520)
+    except Exception:
+        pass
     for fname in ('TkDefaultFont', 'TkTextFont', 'TkMenuFont'):
         try:
             tkfont.nametofont(fname).configure(size=13 if sys.platform == 'darwin' else 11)
@@ -831,6 +839,17 @@ def run_gui():
     sbar.pack(fill='x', padx=8, pady=(0, 6))
     ttk.Label(sbar, textvariable=var['status'], width=26).pack(side='left')
     ttk.Label(sbar, textvariable=var['info']).pack(side='left', padx=8)
+
+    # the bottom blocks (composer, receive monitor, status bar) are packed first, so they keep their space and
+    # only the chat shrinks when the window is small
+    mid.pack_forget()
+    sbar.pack_forget()
+    mon.pack_forget()
+    bot.pack_forget()
+    sbar.pack(side='bottom', fill='x', padx=8, pady=(0, 6))
+    mon.pack(side='bottom', fill='x', padx=8, pady=(0, 6))
+    bot.pack(side='bottom', fill='x', padx=8, pady=6)
+    mid.pack(side='top', fill='both', expand=True, padx=8, pady=4)
 
     # ---------------------------------------------------------------- logic glue
     def pull_settings():
