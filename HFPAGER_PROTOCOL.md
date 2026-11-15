@@ -20,7 +20,7 @@ CRCs passing, and the transmitter in `hfpager_modem.py` reproduces the recorded 
 | 5.86 Bd | 48000/8192 = 5.859375 | 8192 | 2 x baud = 11.71875 Hz | 24 | verified |
 | 23.44 Bd | 48000/2048 = 23.4375 | 2048 | 1 x baud = 23.4375 Hz | 76 | verified |
 | 1.46 Bd | 48000/32768 | 32768 | ~2 x baud (6-tone preamble step 17.6 Hz) | ~11? | **not decoded** |
-| 46.88 Bd | 48000/1024 = 46.875 | 1024 | 1 x baud = 46.875 Hz | 149 | verified (one recording: `AAA`, 10048 -> 1, #226, no ACK request) |
+| 46.88 Bd | 48000/1024 = 46.875 | 1024 | 1 x baud = 46.875 Hz | 149 | verified (two recordings: `AAA`, 10048 -> 1, #226 and `ABCDEFGH1234567890`, #227; preamble 149 for both) |
 
 Frame on the air: `[preamble: N symbols][reference symbol][nibbles ...][2 trailing symbols]`.
 The preamble is the nibble `6` repeated N times (= +6 tones per symbol, tone pattern 0,6,12,0,6,12...).

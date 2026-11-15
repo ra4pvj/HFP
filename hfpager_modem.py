@@ -14,7 +14,7 @@ import numpy as np
 SPEEDS = {
     '5.86':  dict(baud=48000/8192, step=2*48000/8192, pre=24),   # verified
     '23.44': dict(baud=48000/2048, step=48000/2048,   pre=76),   # verified
-    '46.88': dict(baud=48000/1024, step=48000/1024,   pre=149),  # verified (one recording: AAA 10048>1 #226)
+    '46.88': dict(baud=48000/1024, step=48000/1024,   pre=149),  # verified (2 recordings: AAA #226, ABCDEFGH1234567890 #227)
 }
 BAUD=STEP=PRE_COUNT=None; CUR_SPEED=None
 def set_speed(name):
