@@ -12,7 +12,7 @@ import hfpager_modem as M
 
 MODEM_LOCK = threading.RLock()      # hfpager_modem keeps the current speed in module globals
 
-SPEED_ORDER = ('5.86', '23.44')
+SPEED_ORDER = ('5.86', '23.44', '46.88')
 
 
 # ----------------------------------------------------------------------------- DSP helpers

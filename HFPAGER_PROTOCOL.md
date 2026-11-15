@@ -1,8 +1,8 @@
 # HFPager (PS-18) modem — reverse-engineered format
 
-Source of facts: 53 recordings (5.86 Bd, 23.44 Bd, one beacon) and the native modem library
+Source of facts: 54 recordings (5.86 Bd, 23.44 Bd, 46.88 Bd, one beacon) and the native modem library
 (`lib_hfp_rx.so`, CRC lookup tables and check-nibble logic). Everything marked **[verified]**
-was reproduced bit-exactly: 47/47 frames at 5.86 Bd and 5/5 frames at 23.44 Bd decode with all
+was reproduced bit-exactly: 47/47 frames at 5.86 Bd, 5/5 frames at 23.44 Bd and the 46.88 Bd frame decode with all
 CRCs passing, and the transmitter in `hfpager_modem.py` reproduces the recorded tone sequences.
 
 ## 1. Physical layer
@@ -20,7 +20,7 @@ CRCs passing, and the transmitter in `hfpager_modem.py` reproduces the recorded 
 | 5.86 Bd | 48000/8192 = 5.859375 | 8192 | 2 x baud = 11.71875 Hz | 24 | verified |
 | 23.44 Bd | 48000/2048 = 23.4375 | 2048 | 1 x baud = 23.4375 Hz | 76 | verified |
 | 1.46 Bd | 48000/32768 | 32768 | ~2 x baud (6-tone preamble step 17.6 Hz) | ~11? | **not decoded** |
-| 46.88 Bd | – | – | – | – | no recording |
+| 46.88 Bd | 48000/1024 = 46.875 | 1024 | 1 x baud = 46.875 Hz | 149 | verified (one recording: `AAA`, 10048 -> 1, #226, no ACK request) |
 
 Frame on the air: `[preamble: N symbols][reference symbol][nibbles ...][2 trailing symbols]`.
 The preamble is the nibble `6` repeated N times (= +6 tones per symbol, tone pattern 0,6,12,0,6,12...).
