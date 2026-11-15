@@ -1,4 +1,4 @@
-name: Build Windows exe + macOS app
+name: Build Windows exe + macOS app + Linux
 on:
   workflow_dispatch:
     inputs:
@@ -57,9 +57,33 @@ jobs:
           name: HFPagerApp-macos-${{ matrix.arch }}
           path: HFPagerApp-macos-${{ matrix.arch }}.zip
 
+  build-linux:
+    # built on Ubuntu 22.04 (glibc 2.35) so it also runs on newer distributions
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y libportaudio2 tk8.6 python3-tk
+      - run: python -m pip install -r requirements.txt pyinstaller
+      - name: Build (libportaudio is bundled, the sound library is not part of the pip wheel on Linux)
+        run: |
+          PA=$(ldconfig -p | awk '/libportaudio\.so\.2 /{print $NF; exit}')
+          echo "portaudio: $PA"
+          python -m PyInstaller --noconfirm --onedir --windowed --name HFPagerApp --collect-all sounddevice \
+            --add-binary "$PA:." \
+            --hidden-import hfpager_modem --hidden-import hfpager_rx --hidden-import hfpager_ptt --hidden-import hfpager_rig \
+            --hidden-import serial.tools.list_ports hfpager_app.py
+      - run: tar -czf HFPagerApp-linux-x64.tar.gz -C dist HFPagerApp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HFPagerApp-linux-x64
+          path: HFPagerApp-linux-x64.tar.gz
+
   release:
     # runs for a pushed tag v* or for a manual run with a version filled in
-    needs: [build, build-macos]
+    needs: [build, build-macos, build-linux]
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.version != ''
     runs-on: ubuntu-latest
     steps:
@@ -82,12 +106,14 @@ jobs:
           - `HFPagerApp-windows-x64.zip` — Windows 7/8/10/11, 64 бита
           - `HFPagerApp-windows-x86.zip` — Windows 7/8/10/11, 32 бита
           - `HFPagerApp-macos-arm64.zip` — macOS на Apple Silicon (M1 и новее); `HFPagerApp-macos-x64.zip` — Mac с процессором Intel
+          - `HFPagerApp-linux-x64.tar.gz` — Linux x86-64 (`tar -xzf`, затем `./HFPagerApp/HFPagerApp`); Python и tkinter внутри, звук через ALSA/PulseAudio/PipeWire; для CAT/PTT по COM-порту добавьте себя в группу `dialout`
           - `HFPagerApp-source.zip` — исходный код (Python 3.8+, `pip install -r requirements.txt`)
 
           Распакуйте архив целиком и запустите `HFPagerApp.exe`. На Windows 7 нужны SP1 и обновление KB2999226 (Universal C Runtime). Mac: распакуйте, перенесите `HFPagerApp.app` в «Программы», первый запуск — правый клик → «Открыть» (приложение без сертификата разработчика); разрешите доступ к микрофону. Подробнее — `README_APP.md`, `README_MAC.md`.
           NOTES
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.zip --clobber
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" dist/*.zip --title "HFPagerApp $TAG" --notes-file notes.md --generate-notes --target "$GITHUB_SHA"
+            gh release create "$TAG" dist/* --title "HFPagerApp $TAG" --notes-file notes.md --generate-notes --target "$GITHUB_SHA"
           fi

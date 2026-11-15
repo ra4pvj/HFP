@@ -155,3 +155,12 @@
 частоты (≈ +6.85 Гц и −13.7 Гц) в середине символов; приёмник измеряет данные только на границах символов и скачки игнорирует.
 Проверено на двух записях (1 символ) и на синтетических сигналах с такими скачками при ОСШ около 12 дБ; в эфире не проверялось.
 Для приёма длинных кадров на 1.46 Бод буфер увеличен до ≈ 10 минут (≈ 150 символов текста).
+
+## Linux
+Готовая сборка: `HFPagerApp-linux-x64.tar.gz` в Releases (собрана на Ubuntu 22.04, x86-64):
+`tar -xzf HFPagerApp-linux-x64.tar.gz && ./HFPagerApp/HFPagerApp`. Python, tkinter и PortAudio внутри архива;
+звук идёт через систему (ALSA / PulseAudio / PipeWire), выберите устройство в списках входа и выхода.
+Для CAT/PTT через COM-порт (`/dev/ttyUSB0`, `/dev/ttyACM0`) добавьте себя в группу: `sudo usermod -aG dialout $USER`
+и перезайдите в систему. Из исходников: `sudo apt install python3-tk libportaudio2`, `pip install -r requirements.txt`,
+`python3 hfpager_app.py`. Настройки: `~/.config/HFPagerApp`, журнал: `~/Documents/HFPagerApp/messages.txt`.
+На Linux не проверялось (только сборка в Actions).
