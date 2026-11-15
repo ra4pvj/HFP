@@ -18,7 +18,13 @@
 ## Звук
 В списках устройств выберите USB-аудиоинтерфейс трансивера (Core Audio). Входной и выходной
 уровни настраиваются в «Настройки → Звук» и в «Аудио-MIDI настройке» (частота 48000 Гц).
-Настройки и журнал: `~/Library/Application Support/HFPagerApp`.
+Настройки: `~/Library/Application Support/HFPagerApp`; журнал сообщений: `~/Documents/HFPagerApp/messages.txt`.
 
 Остальное (АПЧ, ограничения, что проверено) – как в `README_APP.md`. Я не мог запускать программу
 на Mac: для macOS проверена только логика с имитацией звуковой карты и tkinter.
+
+## Готовое приложение (GitHub Releases)
+Во вкладке Releases репозитория лежат `HFPagerApp-macos-arm64.zip` (Apple Silicon) и `HFPagerApp-macos-x64.zip` (Intel).
+Распакуйте, перенесите `HFPagerApp.app` в «Программы». Первый запуск: правый клик → «Открыть» → «Открыть»;
+если macOS пишет, что приложение повреждено, выполните в Терминале `xattr -cr /Applications/HFPagerApp.app`.
+Сборки без нотаризации и подписи разработчика, на реальном Mac не проверялись.

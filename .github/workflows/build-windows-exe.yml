@@ -1,4 +1,4 @@
-name: Build Windows exe
+name: Build Windows exe + macOS app
 on:
   workflow_dispatch:
     inputs:
@@ -32,16 +32,41 @@ jobs:
           name: HFPagerApp-windows-${{ matrix.arch }}
           path: HFPagerApp-windows-${{ matrix.arch }}.zip
 
+  build-macos:
+    # PyInstaller .app bundle (ad-hoc signed, not notarized); Apple Silicon and Intel are separate builds
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.arch == 'x64' }}      # the Intel runner must not block the release
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pyinstaller
+      - run: python -m PyInstaller --noconfirm hfpager_mac.spec
+      - run: codesign --force --deep --sign - dist/HFPagerApp.app
+      - run: ditto -c -k --sequesterRsrc --keepParent dist/HFPagerApp.app HFPagerApp-macos-${{ matrix.arch }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HFPagerApp-macos-${{ matrix.arch }}
+          path: HFPagerApp-macos-${{ matrix.arch }}.zip
+
   release:
     # runs for a pushed tag v* or for a manual run with a version filled in
-    needs: build
+    needs: [build, build-macos]
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: HFPagerApp-windows-*
+          pattern: HFPagerApp-*
           merge-multiple: true
           path: dist
       - name: Source archive
@@ -56,9 +81,10 @@ jobs:
 
           - `HFPagerApp-windows-x64.zip` — Windows 7/8/10/11, 64 бита
           - `HFPagerApp-windows-x86.zip` — Windows 7/8/10/11, 32 бита
+          - `HFPagerApp-macos-arm64.zip` — macOS на Apple Silicon (M1 и новее); `HFPagerApp-macos-x64.zip` — Mac с процессором Intel
           - `HFPagerApp-source.zip` — исходный код (Python 3.8+, `pip install -r requirements.txt`)
 
-          Распакуйте архив целиком и запустите `HFPagerApp.exe`. На Windows 7 нужны SP1 и обновление KB2999226 (Universal C Runtime). Подробнее — `README_APP.md`.
+          Распакуйте архив целиком и запустите `HFPagerApp.exe`. На Windows 7 нужны SP1 и обновление KB2999226 (Universal C Runtime). Mac: распакуйте, перенесите `HFPagerApp.app` в «Программы», первый запуск — правый клик → «Открыть» (приложение без сертификата разработчика); разрешите доступ к микрофону. Подробнее — `README_APP.md`, `README_MAC.md`.
           NOTES
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.zip --clobber
