@@ -12,7 +12,7 @@ import hfpager_modem as M
 
 MODEM_LOCK = threading.RLock()      # hfpager_modem keeps the current speed in module globals
 
-SPEED_ORDER = ('5.86', '23.44', '46.88')
+SPEED_ORDER = ('5.86', '23.44', '46.88', '1.46')
 
 
 # ----------------------------------------------------------------------------- DSP helpers
@@ -137,6 +137,14 @@ def decode_segment(x, fs, t_on, speed, afc=True, band=None, max_sym=None):
     with MODEM_LOCK:
         M.set_speed(speed)
         baud, step, pre = M.BAUD, M.STEP, M.PRE_COUNT
+        if M.SPEEDS[speed].get('demod') == 'edge':          # 1.46 Bd: boundary-jump demodulator
+            if band is None:
+                band = estimate_band(x, fs, step)
+            fr, info = M.edge_decode(x, fs, t_on, fc=0.5 * (band[0] + band[1]))
+            if fr:
+                fr['speed'] = speed
+            info['speed'] = speed
+            return fr, info
         T0 = fs / baud
         if band is None:
             band = estimate_band(x, fs, step)
@@ -233,7 +241,7 @@ class RxEngine:
         self._dq = queue.Queue()
         self._stop = False
         self._threads = []
-        self.max_blocks = int(260 / self.BLOCK_S)
+        self.max_blocks = int((620 if '1.46' in self.speeds else 260) / self.BLOCK_S)
         self.floor = None
 
     # ---- control
@@ -350,7 +358,7 @@ class RxEngine:
                 self._act_run = 0
                 self._recent.clear()
                 if seg['active'] >= self.min_active:
-                    x = np.concatenate(seg['blocks']).astype(np.float64)
+                    x = np.concatenate(seg['blocks']).astype(np.float32 if len(seg['blocks']) > 3000 else np.float64)
                     self._dq.put((x, seg['n_on'] * self.BLOCK_S))
                     self.on_event('state', {'state': 'decoding'})
                 else:

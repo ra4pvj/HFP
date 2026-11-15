@@ -12,6 +12,7 @@ import numpy as np
 
 # speed table: baud (48 kHz / samples-per-symbol), tone spacing in Hz, preamble length in symbols
 SPEEDS = {
+    '1.46':  dict(baud=48000/32768, step=2*48000/32768, pre=11, demod='edge'),  # verified (1 recording: A #228)
     '5.86':  dict(baud=48000/8192, step=2*48000/8192, pre=24),   # verified
     '23.44': dict(baud=48000/2048, step=48000/2048,   pre=76),   # verified
     '46.88': dict(baud=48000/1024, step=48000/1024,   pre=149),  # verified (2 recordings: AAA #226, ABCDEFGH1234567890 #227)
@@ -283,11 +284,85 @@ def decode_segment(x,fs,t0,t1,fmin=1000,fmax=2400):
         for o0 in (0.0,0.25*STEP,-0.25*STEP):
             cands.append(_nibbles_from_freqs(f,1,o0))
     return cands
+# ------------------------------------------------------------------ edge demodulator (1.46 Bd)
+# At 1.46 Bd the tone step is only 2.93 Hz and the recordings contain random frequency steps of about
+# +6.85 Hz / -13.7 Hz in the middle of symbols.  Per-symbol FFT peaks are useless there, so the data step
+# is measured at the symbol boundary only: median frequency just after minus just before the boundary.
+def _center_freq(x,fs,lo=300.0,hi=3000.0):
+    nfft=1<<14; n=len(x)//nfft
+    if n<1: return 0.5*(lo+hi)
+    p=np.zeros(nfft//2+1)
+    for i in range(0,n,max(1,n//64)):
+        p+=np.abs(np.fft.rfft(np.asarray(x[i*nfft:(i+1)*nfft],float)*np.hanning(nfft)))**2
+    fr=np.fft.rfftfreq(nfft,1/fs); m=(fr>=lo)&(fr<=hi); fr,p=fr[m],p[m]
+    sm=np.convolve(p,np.ones(60)/60,'same')
+    return float(fr[np.argmax(sm)])
+def _baseband_inst(x,fs,fc,D=None):
+    """instantaneous frequency (Hz) of the signal near fc: heterodyne + boxcar decimation + phase difference.
+    returns (inst, rate) - inst[i] belongs to time (i+1)/rate"""
+    D=D or max(int(fs/220),1); n=len(x)//D*D; out=np.empty(n//D,complex); CH=D*2048
+    for i in range(0,n,CH):
+        seg=np.asarray(x[i:min(i+CH,n)],float); t=np.arange(i,i+len(seg))/fs
+        out[i//D:(i+len(seg))//D]=(seg*np.exp(-2j*np.pi*fc*t)).reshape(-1,D).mean(1)
+    fd=fs/D
+    return fc+np.angle(out[1:]*np.conj(out[:-1]))*fd/(2*np.pi), fd
+def edge_steps(inst,fd,t0,T,nb,w=(0.012,0.04)):
+    """tone steps (float, in units of STEP) at boundaries t0+k*T, k=1..nb"""
+    def med(a,b):
+        i0=int(a*fd); i1=max(int(b*fd),i0+1)
+        return float(np.median(inst[i0:i1])) if 0<=i0 and i1<=len(inst) else np.nan
+    out=[]
+    for k in range(1,nb+1):
+        b=t0+k*T
+        out.append((med(b+w[0],b+w[1])-med(b-w[1],b-w[0]))/STEP)
+    return np.array(out)
+def edge_decode(x,fs,t_on=0.0,fc=None):
+    """decode one frame of an 'edge' speed (current speed) from samples x; returns (frame or None, info)"""
+    baud,pre=BAUD,PRE_COUNT; T=1.0/baud
+    if fc is None: fc=_center_freq(x,fs)
+    inst,fd=_baseband_inst(x,fs,fc)
+    dur=len(x)/fs
+    def sc(t0):
+        v=edge_steps(inst,fd,t0,T,8)
+        return float(np.sum(np.minimum(np.abs(np.nan_to_num(v)),8.0)))
+    base=max(t_on-0.45,0.0)
+    cand=sorted(((sc(t),t) for t in np.arange(base,base+T,0.005)),reverse=True)
+    for _,t0 in cand[:3]:
+        for scale in (1.0,1-2e-4,1+2e-4,1-5e-4,1+5e-4):
+            Ts=T*scale; nb=int((dur-t0)/Ts)-1
+            if nb<pre+62: continue
+            for w in ((0.012,0.04),(0.01,0.06),(0.02,0.03)):
+                v=edge_steps(inst,fd,t0,Ts,nb,w)
+                st=np.round(np.nan_to_num(v)).astype(int)%NTONE
+                # preamble: longest run of +6 steps
+                best=(0,0); i=0
+                while i<len(st):
+                    if st[i]==6:
+                        j=i
+                        while j<len(st) and st[j]==6: j+=1
+                        if j-i>best[1]-best[0]: best=(i,j)
+                        i=j
+                    else: i+=1
+                a,e=best
+                if e-a<max(5,pre-4): continue
+                nib_all=[gray(int((q-2)%NTONE)) if ((q-2)%NTONE)<16 else 99 for q in st]
+                for r in sorted({a+pre+j for j in range(-2,3)}|{e+j for j in range(-2,1)}):
+                    fr=parse_frame(nib_all[r:])
+                    if fr:
+                        return fr,dict(mode='edge',center_hz=float(fc),afc_hz=0.0,t_start=float(t0+a*Ts),
+                                       scale=scale,window=w)
+    return None,dict(mode='edge',center_hz=float(fc))
 def decode_wav(path,speeds=None):
     x,fs=read_wav(path); res=[]
     names=speeds or list(SPEEDS); prev=CUR_SPEED
     for name in names:
         set_speed(name)
+        if SPEEDS[name].get('demod')=='edge':
+            for a,b in find_frames(x,fs):
+                seg=x[max(int((a-1.0)*fs),0):int((b+1.0)*fs)]
+                fr,_=edge_decode(seg,fs,1.0 if a>=1.0 else a)
+                if fr: fr['speed']=name; res.append((a,fr))
+            continue
         for a,b in find_frames(x,fs):
             ns=(b-a)*BAUD
             if ns<PRE_COUNT+1+60: continue

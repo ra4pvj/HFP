@@ -19,13 +19,22 @@ CRCs passing, and the transmitter in `hfpager_modem.py` reproduces the recorded 
 |---|---|---|---|---|---|
 | 5.86 Bd | 48000/8192 = 5.859375 | 8192 | 2 x baud = 11.71875 Hz | 24 | verified |
 | 23.44 Bd | 48000/2048 = 23.4375 | 2048 | 1 x baud = 23.4375 Hz | 76 | verified |
-| 1.46 Bd | 48000/32768 | 32768 | ~2 x baud (6-tone preamble step 17.6 Hz) | ~11? | **not decoded** |
+| 1.46 Bd | 48000/32768 = 1.4648 | 32768 | 2 x baud = 2.93 Hz | 11 | verified (two recordings: `A` 10048 -> 46 #158 and `A` 10048 -> 1 #228); needs the *edge* demodulator, see below |
 | 46.88 Bd | 48000/1024 = 46.875 | 1024 | 1 x baud = 46.875 Hz | 149 | verified (two recordings: `AAA`, 10048 -> 1, #226 and `ABCDEFGH1234567890`, #227; preamble 149 for both) |
 
 Frame on the air: `[preamble: N symbols][reference symbol][nibbles ...][2 trailing symbols]`.
 The preamble is the nibble `6` repeated N times (= +6 tones per symbol, tone pattern 0,6,12,0,6,12...).
 The symbol after the preamble is the differential reference; data nibble 0 is the step from the
 reference symbol to the next one. The two trailing symbols carry no data.
+
+## 1a. 1.46 Bd specifics
+Frame layout, FEC and CRCs are identical to the other speeds (preamble 11 steps of +6, 1 + 120 + 2 symbols for a short text,
+about 91 s on the air). The recordings show, in addition to the data, **random frequency steps of about +6.85 Hz and
+-13.7 Hz in the middle of symbols** (about one every 1-3 s; +6.85 Hz is more than 2 tone steps). They look like an impairment of
+the recording chain, but they are too large for a per-symbol FFT peak demodulator. `hfpager_modem.edge_decode` therefore measures
+the data step only at the symbol boundary (median frequency 12-40 ms after minus before the boundary, tracked via a
+heterodyne + decimated phase difference); mid-symbol steps are ignored. Verified on the two recordings and on synthetic frames
+with simulated steps at 12 dB SNR.
 
 ## 2. Nibble stream: superblocks
 
@@ -90,7 +99,7 @@ re-encodes the recorded ACK bit-exactly (including RS parity) from these fields.
 
 ## 5. Open items
 
-1. 1.46 Bd mode: preamble length, tone mapping and possibly a different frame arrangement.
+1. 1.46 Bd: only 1-character frames seen; the random frequency steps (+6.85 / -13.7 Hz, see section 1a) are not explained.
 2. Meaning of ACK bytes B1, B5, B6, B7; the NAK frame (type 0x0A?); retransmission and timeout logic —
    needs more ACK/NAK recordings (different lengths, counters, speeds).
 3. Exact meaning of the 2 trailing symbols, the CW tail of the beacon, GPS frames.
