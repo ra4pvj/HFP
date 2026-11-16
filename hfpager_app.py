@@ -40,7 +40,7 @@ def _app_dir():
                         'HFPagerApp')
 
 
-APP_VERSION = '2026-11-05c'
+APP_VERSION = '2026-11-16a'
 APP_DIR = _app_dir()
 MONO_FONT = 'Menlo' if sys.platform == 'darwin' else ('Consolas' if sys.platform.startswith('win') else 'DejaVu Sans Mono')
 SETTINGS_FILE = os.path.join(APP_DIR, 'settings.json')
@@ -198,7 +198,7 @@ class Core:
             self.sys('Не удалось открыть вход звуковой карты: %s' % ex)
             self.stream = None
             return False
-        self.sys('Приём запущен (%d Гц). Распознаются 5.86 и 23.44 Бод, АПЧ %s.' %
+        self.sys('Приём запущен (%d Гц). Распознаются 1.46, 5.86, 23.44 и 46.88 Бод, АПЧ %s.' %
                  (fs, 'включена' if self.s['afc'] else 'выключена'))
         return True
 
