@@ -90,7 +90,7 @@ def frames_set_freq(proto, hz, icom_addr=0x94):
     if proto == 'ICOM':
         return [icom_frame(icom_addr, b'\x05' + bcd_icom(hz))]
     if proto == 'YAESU':
-        return [('FA%09d;' % hz).encode()]
+        return [('FA%08d;' % hz).encode()]
     if proto == 'YAESU-OLD':
         s = '%08d' % (hz // 10)
         return [bytes(int(s[i:i + 2], 16) for i in (0, 2, 4, 6)) + b'\x01']
